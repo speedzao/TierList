@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TierList - Ranqueando</title>
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+
+    <style>
+        /* TEMA VERMELHO E BRANCO */
+        :root {
+            --primary-red: #d32f2f;
+            --dark-red: #b71c1c;
+            --light-bg: #5f5f5f;
+            --white: #ffffff;
+            --border-color: #e0e0e0;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--light-bg);
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        header {
+            background-color: var(--primary-red);
+            width: 100%;
+            padding: 20px;
+            text-align: center;
+            color: var(--white);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        button, .file-upload-label {
+            background-color: var(--primary-red);
+            color: var(--white);
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.3s, transform 0.1s;
+            box-shadow: 0 4px 6px rgba(211, 47, 47, 0.3);
+            text-transform: uppercase;
+            display: inline-block;
+        }
+
+        button:hover, .file-upload-label:hover {
+            background-color: var(--dark-red);
+            transform: translateY(-2px);
+        }
+
+        button:active, .file-upload-label:active {
+            transform: translateY(0);
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        /* TIER LIST CONTAINER */
+        #tier-list {
+            width: 90%;
+            max-width: 1200px;
+            background: var(--white);
+            border: 2px solid var(--primary-red);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .tier-row {
+            display: flex;
+            border-bottom: 2px solid var(--border-color);
+            min-height: 100px;
+            background: var(--white);
+        }
+
+        .tier-row:last-child {
+            border-bottom: none;
+        }
+
+        .tier-label {
+            width: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+            border-right: 2px solid var(--border-color);
+            text-align: center;
+            padding: 10px;
+            outline: none;
+            text-transform: uppercase;
+        }
+
+        /* Cores padrão para as tiers (opcional, pode ser tudo vermelho se preferir) */
+        .tier-row:nth-child(1) .tier-label { background-color: #ff7f7f; }
+        .tier-row:nth-child(2) .tier-label { background-color: #ffbf7f; }
+        .tier-row:nth-child(3) .tier-label { background-color: #ffff7f; }
+        .tier-row:nth-child(4) .tier-label { background-color: #7fff7f; }
+        .tier-row:nth-child(5) .tier-label { background-color: #7fbfff; }
+
+        .tier-items {
+            flex-grow: 1;
+            display: flex;
+            flex-wrap: wrap;
+            padding: 10px;
+            gap: 10px;
+            min-height: 100px;
+            background-color: var(--white);
+        }
+
+        /* BANCO DE IMAGENS */
+        #item-bank {
+            width: 90%;
+            max-width: 1200px;
+            min-height: 150px;
+            background: var(--white);
+            border: 2px dashed var(--primary-red);
+            border-radius: 12px;
+            margin-top: 30px;
+            padding: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 50px;
+        }
+
+        #item-bank:empty::before {
+            content: 'As imagens recortadas aparecerão aqui. Arraste-as para a Tier List!';
+            color: #999;
+            font-style: italic;
+        }
+
+        .draggable-item {
+            width: 90px;
+            height: 90px;
+            object-fit: cover;
+            border-radius: 8px;
+            cursor: grab;
+            border: 2px solid var(--primary-red);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            transition: transform 0.2s;
+        }
+
+        .draggable-item:hover {
+            transform: scale(1.05);
+        }
+
+        .draggable-item:active {
+            cursor: grabbing;
+        }
+
+        /* MODAL DE RECORTE */
+        #crop-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+
+        .modal-content {
+            background: var(--white);
+            padding: 20px;
+            border-radius: 12px;
+            max-width: 90%;
+            max-height: 90%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .img-container {
+            max-width: 800px;
+            max-height: 60vh;
+            margin-bottom: 20px;
+        }
+
+        .img-container img {
+            max-width: 100%;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 15px;
+        }
+
+        .btn-cancel {
+            background-color: #757575;
+            box-shadow: 0 4px 6px rgba(117, 117, 117, 0.3);
+        }
+        
+        .btn-cancel:hover {
+            background-color: #616161;
+        }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>TierList</h1>
+    </header>
+
+    <div class="controls">
+        <label class="file-upload-label">
+            + Adicionar Imagem
+            <input type="file" id="image-upload" accept="image/*">
+        </label>
+        <button id="add-row-btn">+ Nova Categoria</button>
+    </div>
+
+    <div id="tier-list">
+        <div class="tier-row">
+            <div class="tier-label" contenteditable="true">S</div>
+            <div class="tier-items"></div>
+        </div>
+        <div class="tier-row">
+            <div class="tier-label" contenteditable="true">A</div>
+            <div class="tier-items"></div>
+        </div>
+        <div class="tier-row">
+            <div class="tier-label" contenteditable="true">B</div>
+            <div class="tier-items"></div>
+        </div>
+        <div class="tier-row">
+            <div class="tier-label" contenteditable="true" style="background-color: #ff7f7f;">C</div>
+            <div class="tier-items"></div>
+        </div>
+    </div>
+
+    <div id="item-bank" class="tier-items"></div>
+
+    <div id="crop-modal">
+        <div class="modal-content">
+            <h2 style="margin-bottom: 15px; color: var(--primary-red);">Recorte sua imagem</h2>
+            <div class="img-container">
+                <img id="image-to-crop" src="">
+            </div>
+            <div class="modal-actions">
+                <button class="btn-cancel" id="cancel-crop">Cancelar</button>
+                <button id="confirm-crop">Confirmar Recorte</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let cropper;
+        const imageUpload = document.getElementById('image-upload');
+        const cropModal = document.getElementById('crop-modal');
+        const imageToCrop = document.getElementById('image-to-crop');
+        const confirmCropBtn = document.getElementById('confirm-crop');
+        const cancelCropBtn = document.getElementById('cancel-crop');
+        const itemBank = document.getElementById('item-bank');
+        const addRowBtn = document.getElementById('add-row-btn');
+        const tierList = document.getElementById('tier-list');
+
+        let draggedItem = null;
+
+        // --- SISTEMA DE UPLOAD E RECORTE (CROP) ---
+
+        imageUpload.addEventListener('change', function(e) {
+            const files = e.target.files;
+            if (files && files.length > 0) {
+                const file = files[0];
+                const reader = new FileReader();
+                
+                reader.onload = function(event) {
+                    imageToCrop.src = event.target.result;
+                    cropModal.style.display = 'flex';
+                    
+                    // Inicializa o Cropper.js
+                    if (cropper) {
+                        cropper.destroy();
+                    }
+                    cropper = new Cropper(imageToCrop, {
+                        viewMode: 1,
+                        dragMode: 'move',
+                        autoCropArea: 0.5,
+                        restore: false,
+                        guides: true,
+                        center: true,
+                        highlight: false,
+                        cropBoxMovable: true,
+                        cropBoxResizable: true,
+                        toggleDragModeOnDblclick: false,
+                    });
+                };
+                reader.readAsDataURL(file);
+                // Reseta o input para permitir subir a mesma imagem de novo se quiser
+                imageUpload.value = ''; 
+            }
+        });
+
+        cancelCropBtn.addEventListener('click', () => {
+            cropModal.style.display = 'none';
+            if (cropper) cropper.destroy();
+        });
+
+        confirmCropBtn.addEventListener('click', () => {
+            if (!cropper) return;
+
+            // Pega o pedaço recortado como uma imagem base64
+            const canvas = cropper.getCroppedCanvas({
+                width: 150,
+                height: 150
+            });
+            const croppedImageSrc = canvas.toDataURL('image/png');
+
+            // Cria o elemento da imagem
+            const newImg = document.createElement('img');
+            newImg.src = croppedImageSrc;
+            newImg.className = 'draggable-item';
+            newImg.draggable = true;
+            newImg.id = 'item-' + Date.now(); // ID único
+
+            // Adiciona eventos de drag (arrastar)
+            setupDragEvents(newImg);
+
+            // Joga no banco de imagens
+            itemBank.appendChild(newImg);
+
+            // Fecha modal
+            cropModal.style.display = 'none';
+            cropper.destroy();
+        });
+
+
+        // --- SISTEMA DE ARRASTAR E SOLTAR (DRAG & DROP) ---
+
+        function setupDragEvents(item) {
+            item.addEventListener('dragstart', function(e) {
+                draggedItem = this;
+                setTimeout(() => this.style.opacity = '0.5', 0);
+            });
+
+            item.addEventListener('dragend', function() {
+                setTimeout(() => {
+                    this.style.opacity = '1';
+                    draggedItem = null;
+                }, 0);
+            });
+        }
+
+        function setupDropZone(zone) {
+            zone.addEventListener('dragover', function(e) {
+                e.preventDefault(); // Necessário para permitir o drop
+                this.style.background = 'rgba(211, 47, 47, 0.1)';
+            });
+
+            zone.addEventListener('dragleave', function() {
+                this.style.background = 'transparent';
+            });
+
+            zone.addEventListener('drop', function(e) {
+                e.preventDefault();
+                this.style.background = 'transparent';
+                if (draggedItem) {
+                    this.appendChild(draggedItem);
+                }
+            });
+        }
+
+        // Configura as zonas de drop iniciais (as tiers e o banco de itens)
+        document.querySelectorAll('.tier-items').forEach(setupDropZone);
+
+        // --- SISTEMA DE ADICIONAR NOVA LINHA ---
+
+        addRowBtn.addEventListener('click', () => {
+            const newRow = document.createElement('div');
+            newRow.className = 'tier-row';
+            
+            const newLabel = document.createElement('div');
+            newLabel.className = 'tier-label';
+            newLabel.contentEditable = true;
+            newLabel.innerText = 'NOVO';
+            newLabel.style.backgroundColor = '#ccc'; // Cor cinza padrão para novas tiers
+
+            const newItemsArea = document.createElement('div');
+            newItemsArea.className = 'tier-items';
+            
+            // Configura a nova área para aceitar itens arrastados
+            setupDropZone(newItemsArea);
+
+            newRow.appendChild(newLabel);
+            newRow.appendChild(newItemsArea);
+            tierList.appendChild(newRow);
+        });
+
+    </script>
+</body>
+</html>
