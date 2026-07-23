@@ -13,7 +13,7 @@
     <style>
         /* VARIÁVEIS DE TEMA (CLARO / ESCURO) */
         :root {
-            --primary-red: #e50914; /* Vermelho mais vibrante (estilo Netflix/Youtube) */
+            --primary-red: #e50914; 
             --dark-red: #b20710;
             --bg-color: #f0f2f5;
             --container-bg: #ffffff;
@@ -111,7 +111,7 @@
             padding: 12px 28px;
             font-size: 16px;
             font-weight: bold;
-            border-radius: 30px; /* Mais arredondado, visual premium */
+            border-radius: 30px;
             cursor: pointer;
             transition: all 0.3s ease;
             box-shadow: 0 5px 15px rgba(229, 9, 20, 0.3);
@@ -227,7 +227,6 @@
             color: var(--primary-red);
         }
 
-        /* Input de cor invisível sob o ícone de paleta */
         .color-picker-wrapper {
             position: relative;
             display: inline-block;
@@ -311,12 +310,13 @@
             padding: 30px;
             border-radius: 16px;
             max-width: 90%;
-            max-height: 90%;
+            max-height: 95%;
             display: flex;
             flex-direction: column;
             align-items: center;
             box-shadow: 0 20px 50px rgba(0,0,0,0.5);
             border: 2px solid var(--primary-red);
+            overflow-y: auto;
         }
 
         .modal-content h2 {
@@ -328,14 +328,36 @@
 
         .img-container {
             max-width: 800px;
-            max-height: 50vh;
-            margin-bottom: 25px;
+            max-height: 45vh;
+            margin-bottom: 20px;
             border-radius: 8px;
             overflow: hidden;
         }
 
         .img-container img {
             max-width: 100%;
+        }
+
+        .crop-settings {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 25px;
+            font-weight: bold;
+            font-size: 1.1rem;
+            color: var(--text-color);
+            cursor: pointer;
+            background: var(--hover-bg);
+            padding: 10px 20px;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+        }
+
+        .crop-settings input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            accent-color: var(--primary-red);
+            cursor: pointer;
         }
 
         .modal-actions {
@@ -388,6 +410,12 @@
             <div class="img-container">
                 <img id="image-to-crop" src="">
             </div>
+            
+            <label class="crop-settings" title="Desmarque para corte livre. A imagem irá esticar para caber no quadrado final.">
+                <input type="checkbox" id="aspect-lock" checked>
+                Corte Quadrado (Sem esticar)
+            </label>
+
             <div class="modal-actions">
                 <button class="btn-cancel" id="cancel-crop">Cancelar</button>
                 <button id="confirm-crop"><i class="fa-solid fa-check"></i> Confirmar</button>
@@ -400,7 +428,6 @@
         const themeBtn = document.getElementById('theme-btn');
         const themeIcon = themeBtn.querySelector('i');
         
-        // Checa se já tem tema salvo no PC do cara
         const currentTheme = localStorage.getItem('theme') || 'dark';
         document.body.setAttribute('data-theme', currentTheme);
         updateThemeIcon(currentTheme);
@@ -421,7 +448,7 @@
         function updateThemeIcon(theme) {
             if (theme === 'dark') {
                 themeIcon.className = 'fa-solid fa-sun';
-                themeIcon.style.color = '#f1c40f'; // Amarelo no sol
+                themeIcon.style.color = '#f1c40f'; 
             } else {
                 themeIcon.className = 'fa-solid fa-moon';
                 themeIcon.style.color = 'white';
@@ -439,6 +466,7 @@
         const itemBank = document.getElementById('item-bank');
         const addRowBtn = document.getElementById('add-row-btn');
         const tierList = document.getElementById('tier-list');
+        const aspectLock = document.getElementById('aspect-lock'); // Variável da trava
 
         // Tiers Padrão
         const defaultTiers = [
@@ -465,8 +493,9 @@
                     
                     if (cropper) cropper.destroy();
                     
+                    // Inicializa o cropper respeitando o estado atual do Checkbox
                     cropper = new Cropper(imageToCrop, {
-                        aspectRatio: 1, // Mantém quadrado
+                        aspectRatio: aspectLock.checked ? 1 : NaN,
                         viewMode: 1,
                         dragMode: 'move',
                         autoCropArea: 0.8,
@@ -478,6 +507,13 @@
             }
         });
 
+        // Evento que muda a trava em tempo real se o usuário clicar no checkbox
+        aspectLock.addEventListener('change', function() {
+            if (cropper) {
+                cropper.setAspectRatio(this.checked ? 1 : NaN);
+            }
+        });
+
         cancelCropBtn.addEventListener('click', () => {
             cropModal.style.display = 'none';
             if (cropper) cropper.destroy();
@@ -485,12 +521,24 @@
 
         confirmCropBtn.addEventListener('click', () => {
             if (!cropper) return;
-            const canvas = cropper.getCroppedCanvas({ width: 150, height: 150 });
+            
+            // Se estiver travado (quadrado), pegamos num formato fixo. 
+            // Se for livre, pegamos o tamanho original do recorte.
+            const canvasOptions = aspectLock.checked ? { width: 150, height: 150 } : {};
+            const canvas = cropper.getCroppedCanvas(canvasOptions);
             const croppedImageSrc = canvas.toDataURL('image/png');
 
             const newImg = document.createElement('img');
             newImg.src = croppedImageSrc;
             newImg.className = 'draggable-item';
+            
+            // Lógica de "Esticar" vs "Normal"
+            if (!aspectLock.checked) {
+                newImg.style.objectFit = 'fill'; // Faz a imagem retangular esticar nos 100x100
+            } else {
+                newImg.style.objectFit = 'cover'; // Mantém proporção normal (padrão)
+            }
+
             newImg.draggable = true;
             newImg.id = 'item-' + Date.now();
 
@@ -586,11 +634,9 @@
             deleteBtn.innerHTML = '<i class="fa-solid fa-trash"></i>';
             
             deleteBtn.addEventListener('click', () => {
-                // Se a linha tiver imagens, joga elas pro banco de itens antes de deletar!
                 const itemsInside = itemsArea.querySelectorAll('.draggable-item');
                 itemsInside.forEach(item => itemBank.appendChild(item));
                 
-                // Animaçãozinha antes de sumir
                 row.style.opacity = '0';
                 setTimeout(() => row.remove(), 300);
             });
@@ -598,7 +644,6 @@
             settingsArea.appendChild(colorWrapper);
             settingsArea.appendChild(deleteBtn);
 
-            // Monta a linha
             row.appendChild(label);
             row.appendChild(itemsArea);
             row.appendChild(settingsArea);
